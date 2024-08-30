@@ -1,0 +1,61 @@
+name: LeetCode Sync
+
+on:
+  schedule:
+    - cron: "*/5 * * * *" # Runs every 5 mins for testing 
+  workflow_dispatch: # Allows manual triggering from the GitHub Actions UI
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4
+
+      - name: Fetch LeetCode solutions
+        env:
+          LEETCODE_USERNAME: ${{ secrets.LEETCODE_USERNAME }}
+          LEETCODE_PASSWORD: ${{ secrets.LEETCODE_PASSWORD }}
+        run: |
+          # Python script to fetch LeetCode solutions
+          import os
+          import requests
+          from bs4 import BeautifulSoup
+
+          session = requests.Session()
+          login_url = 'https://leetcode.com/accounts/login/'
+          credentials = {
+              'login': os.environ['LEETCODE_USERNAME'],
+              'password': os.environ['LEETCODE_PASSWORD']
+          }
+          session.post(login_url, data=credentials)
+
+          submissions_url = 'https://leetcode.com/api/submissions/'
+          response = session.get(submissions_url)
+          data = response.json()
+
+          for submission in data['submissions_dump']:
+              problem_name = submission['title_slug']
+              code = submission['code']
+              language = submission['lang']
+              with open(f'{problem_name}.{language}', 'w') as file:
+                  file.write(code)
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add .
+          git commit -m "Add LeetCode solutions"
+          git push origin main
